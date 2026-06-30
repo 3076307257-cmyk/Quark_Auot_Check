@@ -1,0 +1,41 @@
+name: Keepalive Workflow
+
+on:
+  schedule:
+    # 每天 UTC 时间 00:30 运行（北京时间 08:30）
+    - cron: "30 0 * * *"
+  # 允许手动触发（网页上会显示 Run workflow 按钮）
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # 拉取完整的提交历史，以便计算上次提交的时间
+          fetch-depth: 0
+
+      - name: Check last commit and keep alive
+        run: |
+          # 获取上一次提交的时间戳（秒）
+          LAST_COMMIT_TIMESTAMP=$(git log -1 --format=%ct)
+          CURRENT_TIMESTAMP=$(date +%s)
+          DAYS_DIFF=$(( (CURRENT_TIMESTAMP - LAST_COMMIT_TIMESTAMP) / 86400 ))
+
+          echo "距离上次提交已过去 $DAYS_DIFF 天"
+
+          # 如果超过 45 天，创建一个空提交来刷新仓库活跃度
+          if [ $DAYS_DIFF -ge 45 ]; then
+            echo "仓库即将进入非活跃状态，正在创建保活提交..."
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "Automated keepalive commit to prevent inactivity"
+            git push
+          else
+            echo "仓库近期活跃，无需处理。"
+          fi
