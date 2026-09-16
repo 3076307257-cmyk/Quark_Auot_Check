@@ -3,7 +3,6 @@ name: Quark Sign-in
 on:
   schedule:
     - cron: '0 1 * * *'  # 每天 UTC 时间 1:00 执行，即北京时间 9:00
-
   workflow_dispatch:  # 手动触发
 
 jobs:
@@ -21,8 +20,20 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Run Quark Sign-in
+      - name: Run Quark Sign-in (with retry)
         env:
           COOKIE_QUARK: ${{ secrets.COOKIE_QUARK }}
         run: |
-          python checkIn_Quark.py
+          set +e
+          for i in 1 2 3; do
+            echo "===== Attempt $i ====="
+            python checkIn_Quark.py
+            if [ $? -eq 0 ]; then
+              echo "✅ Sign-in successful."
+              exit 0
+            fi
+            echo "❌ Attempt $i failed, retrying in 10 seconds..."
+            sleep 10
+          done
+          echo "❌ All attempts failed."
+          exit 1
